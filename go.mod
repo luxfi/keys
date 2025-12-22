@@ -1,41 +1,31 @@
 module github.com/luxfi/keys
 
-go 1.26.4
+go 1.25.5
 
 require (
-	github.com/luxfi/address v1.0.1
-	github.com/luxfi/constants v1.5.8
-	github.com/luxfi/crypto v1.20.0
-	github.com/luxfi/go-bip32 v1.1.0
-	github.com/luxfi/go-bip39 v1.2.0
-	github.com/luxfi/ids v1.3.0
-	github.com/luxfi/protocol v0.0.2
-	github.com/luxfi/tls v1.0.3
-	golang.org/x/crypto v0.52.0
+	github.com/luxfi/constants v1.2.3
+	github.com/luxfi/crypto v1.17.25
+	github.com/luxfi/ids v1.2.4
+	github.com/luxfi/node v1.22.37
+	golang.org/x/crypto v0.46.0
 )
 
 require (
 	github.com/btcsuite/btcd/btcutil v1.1.6 // indirect
-	github.com/cloudflare/circl v1.6.3 // indirect
-	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.1 // indirect
+	github.com/cloudflare/circl v1.6.2-0.20251204010831-23491bd573cf // indirect
+	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
+	github.com/google/renameio/v2 v2.0.0 // indirect
 	github.com/gorilla/rpc v1.2.1 // indirect
-	github.com/holiman/uint256 v1.3.2 // indirect
-	github.com/luxfi/accel v1.2.4 // indirect
-	github.com/luxfi/cache v1.2.1 // indirect
-	github.com/luxfi/container v0.0.4 // indirect
-	github.com/luxfi/formatting v1.0.1 // indirect
-	github.com/luxfi/geth v1.16.98 // indirect
-	github.com/luxfi/math v1.4.1 // indirect
-	github.com/luxfi/math/big v0.1.0 // indirect
-	github.com/luxfi/metric v1.5.7 // indirect
-	github.com/luxfi/mock v0.1.1 // indirect
-	github.com/luxfi/sampler v1.1.0 // indirect
-	github.com/luxfi/vm v1.2.0 // indirect
+	github.com/klauspost/compress v1.18.0 // indirect
+	github.com/luxfi/cache v1.0.0 // indirect
+	github.com/luxfi/consensus v1.22.35 // indirect
+	github.com/luxfi/math v1.0.2 // indirect
+	github.com/luxfi/mock v0.1.0 // indirect
+	github.com/luxfi/utils v1.0.0 // indirect
 	github.com/mr-tron/base58 v1.2.0 // indirect
 	github.com/supranational/blst v0.3.16 // indirect
 	go.uber.org/mock v0.6.0 // indirect
-	golang.org/x/exp v0.0.0-20260312153236-7ab1446f8b90 // indirect
-	golang.org/x/sys v0.45.0 // indirect
-	gonum.org/v1/gonum v0.17.0 // indirect
-	google.golang.org/protobuf v1.36.11 // indirect
+	golang.org/x/exp v0.0.0-20250819193227-8b4c13bb791b // indirect
+	golang.org/x/sys v0.39.0 // indirect
+	gonum.org/v1/gonum v0.16.0 // indirect
 )
