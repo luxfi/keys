@@ -5,12 +5,16 @@ go 1.25.5
 require (
 	github.com/luxfi/constants v1.2.3
 	github.com/luxfi/crypto v1.17.25
+	github.com/luxfi/go-bip32 v1.0.1
+	github.com/luxfi/go-bip39 v1.1.2
 	github.com/luxfi/ids v1.2.4
 	github.com/luxfi/node v1.22.37
 	golang.org/x/crypto v0.46.0
 )
 
 require (
+	github.com/FactomProject/basen v0.0.0-20150613233007-fe3947df716e // indirect
+	github.com/FactomProject/btcutilecc v0.0.0-20130527213604-d3a63a5752ec // indirect
 	github.com/btcsuite/btcd/btcutil v1.1.6 // indirect
 	github.com/cloudflare/circl v1.6.2-0.20251204010831-23491bd573cf // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
