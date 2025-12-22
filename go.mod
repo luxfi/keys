@@ -8,7 +8,7 @@ require (
 	github.com/luxfi/go-bip32 v1.0.2
 	github.com/luxfi/go-bip39 v1.1.2
 	github.com/luxfi/ids v1.2.5
-	github.com/luxfi/node v1.22.44
+	github.com/luxfi/node v1.22.45
 	golang.org/x/crypto v0.46.0
 )
 
