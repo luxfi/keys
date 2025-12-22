@@ -10,22 +10,19 @@ package keys
 
 import (
 	"crypto/ecdsa"
-	"crypto/elliptic"
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
-	"math/big"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/luxfi/crypto/bls"
 	"github.com/luxfi/crypto/bls/signer/localsigner"
 	luxcrypto "github.com/luxfi/crypto/secp256k1"
-	"github.com/luxfi/go-bip32"
-	"github.com/luxfi/go-bip39"
 	"github.com/luxfi/ids"
-	"github.com/luxfi/protocol/p/signer"
-	luxtls "github.com/luxfi/tls"
+	"github.com/luxfi/node/staking"
+	"github.com/luxfi/node/vms/platformvm/signer"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -75,7 +72,7 @@ func GenerateValidatorKey() (*ValidatorKey, error) {
 	vk := &ValidatorKey{}
 
 	// 1. Generate TLS staking key
-	certPEM, keyPEM, err := luxtls.NewCertAndKeyBytes()
+	certPEM, keyPEM, err := staking.NewCertAndKeyBytes()
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate TLS cert: %w", err)
 	}
@@ -84,7 +81,7 @@ func GenerateValidatorKey() (*ValidatorKey, error) {
 	vk.StakerKey = keyPEM
 
 	// Parse cert to derive NodeID
-	tlsCert, err := luxtls.LoadTLSCertFromBytes(keyPEM, certPEM)
+	tlsCert, err := staking.LoadTLSCertFromBytes(keyPEM, certPEM)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse TLS cert: %w", err)
 	}
@@ -214,46 +211,32 @@ func (ks *KeyStore) Load(name string) (*ValidatorKey, error) {
 func LoadFromDir(nodeDir string) (*ValidatorKey, error) {
 	vk := &ValidatorKey{}
 
-	// Load TLS cert - try modern path first, then legacy
+	// Load TLS cert - try modern path first
 	certPath := filepath.Join(nodeDir, "staking", "staker.crt")
 	certPEM, err := os.ReadFile(certPath)
 	if err != nil {
 		certPath = filepath.Join(nodeDir, "staker.crt")
 		certPEM, err = os.ReadFile(certPath)
-	}
-
-	// Load TLS key
-	keyPath := filepath.Join(nodeDir, "staking", "staker.key")
-	keyPEM, kerr := os.ReadFile(keyPath)
-	if kerr != nil {
-		keyPath = filepath.Join(nodeDir, "staker.key")
-		keyPEM, kerr = os.ReadFile(keyPath)
-	}
-
-	// If TLS cert/key missing, generate them and persist
-	if err != nil || kerr != nil || len(certPEM) == 0 || len(keyPEM) == 0 {
-		fmt.Printf("  Generating TLS staking cert for %s\n", filepath.Base(nodeDir))
-		certPEM, keyPEM, err = luxtls.NewCertAndKeyBytes()
 		if err != nil {
-			return nil, fmt.Errorf("failed to generate TLS cert: %w", err)
-		}
-		// Save to disk for future use
-		stakingDir := filepath.Join(nodeDir, "staking")
-		if err := os.MkdirAll(stakingDir, 0700); err != nil {
-			return nil, fmt.Errorf("failed to create staking dir: %w", err)
-		}
-		if err := os.WriteFile(filepath.Join(stakingDir, "staker.key"), keyPEM, 0600); err != nil {
-			return nil, fmt.Errorf("failed to write staker.key: %w", err)
-		}
-		if err := os.WriteFile(filepath.Join(stakingDir, "staker.crt"), certPEM, 0644); err != nil {
-			return nil, fmt.Errorf("failed to write staker.crt: %w", err)
+			return nil, fmt.Errorf("failed to read staker.crt: %w", err)
 		}
 	}
 	vk.StakerCert = certPEM
+
+	// Load TLS key
+	keyPath := filepath.Join(nodeDir, "staking", "staker.key")
+	keyPEM, err := os.ReadFile(keyPath)
+	if err != nil {
+		keyPath = filepath.Join(nodeDir, "staker.key")
+		keyPEM, err = os.ReadFile(keyPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read staker.key: %w", err)
+		}
+	}
 	vk.StakerKey = keyPEM
 
 	// Derive NodeID from TLS cert
-	tlsCert, err := luxtls.LoadTLSCertFromBytes(keyPEM, certPEM)
+	tlsCert, err := staking.LoadTLSCertFromBytes(keyPEM, certPEM)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load TLS cert: %w", err)
 	}
@@ -272,15 +255,13 @@ func LoadFromDir(nodeDir string) (*ValidatorKey, error) {
 	}
 	if len(signerBytes) > 0 {
 		vk.BLSSecretKey = signerBytes
-		// Derive public key and PoP using localsigner + signer.NewProofOfPossession
-		// This must match how keys are generated in GenerateValidatorKey/DeriveValidatorFromMnemonic
-		blsSigner, err := localsigner.FromBytes(signerBytes)
+		// Derive public key and PoP
+		sk, err := bls.SecretKeyFromBytes(signerBytes)
 		if err == nil {
-			pop, err := signer.NewProofOfPossession(blsSigner)
-			if err == nil {
-				vk.BLSPublicKey = pop.PublicKey[:]
-				vk.BLSPoP = pop.ProofOfPossession[:]
-			}
+			pk := bls.PublicFromSecretKey(sk)
+			vk.BLSPublicKey = bls.PublicKeyToCompressedBytes(pk)
+			sig := bls.Sign(sk, vk.BLSPublicKey)
+			vk.BLSPoP = bls.SignatureToBytes(sig)
 		}
 	}
 
@@ -328,16 +309,7 @@ func (ks *KeyStore) List() ([]string, error) {
 	var names []string
 	for _, entry := range entries {
 		if entry.IsDir() {
-			name := entry.Name()
-			// Skip hidden directories (like .git) and non-node directories
-			if strings.HasPrefix(name, ".") {
-				continue
-			}
-			// Only include node* directories
-			if !strings.HasPrefix(name, "node") {
-				continue
-			}
-			names = append(names, name)
+			names = append(names, entry.Name())
 		}
 	}
 	return names, nil
@@ -397,227 +369,4 @@ func (vk *ValidatorKey) BLSPoPHex() string {
 // CChainAddrHex returns the C-chain address as hex with 0x prefix
 func (vk *ValidatorKey) CChainAddrHex() string {
 	return "0x" + hex.EncodeToString(vk.CChainAddr[:])
-}
-
-// DeriveValidatorsFromMnemonic derives N validator keys from a BIP39 mnemonic.
-// Each validator uses BIP44 path m/44'/60'/0'/0/{index} for the EC key.
-// TLS staking certs and BLS keys are generated fresh (not deterministic from mnemonic).
-// This is designed for runtime use - no files are written to disk.
-func DeriveValidatorsFromMnemonic(mnemonic string, count int) ([]*ValidatorKey, error) {
-	if count <= 0 || count > 100 {
-		return nil, fmt.Errorf("invalid validator count: %d (must be 1-100)", count)
-	}
-
-	validators := make([]*ValidatorKey, count)
-
-	for i := 0; i < count; i++ {
-		vk, err := DeriveValidatorFromMnemonic(mnemonic, uint32(i))
-		if err != nil {
-			return nil, fmt.Errorf("failed to derive validator %d: %w", i, err)
-		}
-		validators[i] = vk
-	}
-
-	return validators, nil
-}
-
-// DeriveValidatorFromMnemonic derives a single validator key from mnemonic at given index.
-// All keys (EC, TLS, BLS) are now derived deterministically from the mnemonic.
-func DeriveValidatorFromMnemonic(mnemonic string, accountIndex uint32) (*ValidatorKey, error) {
-	vk := &ValidatorKey{}
-
-	// 1. Derive EC key from mnemonic using BIP44 path m/44'/60'/0'/0/{index}
-	ecKeyBytes, err := deriveMnemonicKey(mnemonic, accountIndex)
-	if err != nil {
-		return nil, fmt.Errorf("failed to derive EC key: %w", err)
-	}
-	vk.ECPrivateKey = ecKeyBytes
-
-	// Derive P-chain and C-chain addresses
-	luxPrivKey, err := luxcrypto.ToPrivateKey(ecKeyBytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create secp256k1 key: %w", err)
-	}
-	pubKey := luxPrivKey.PublicKey()
-	vk.PChainAddr = ids.ShortID(pubKey.Address())
-	vk.CChainAddr = pubkeyToAddress(pubKey.ToECDSA())
-
-	// 2. Derive TLS staking cert deterministically from mnemonic
-	// Use a separate derivation path: m/44'/60'/1'/0/{index} for TLS keys
-	tlsKeyBytes, err := deriveMnemonicKeyForPath(mnemonic, 1, accountIndex) // account=1 for TLS
-	if err != nil {
-		return nil, fmt.Errorf("failed to derive TLS key seed: %w", err)
-	}
-
-	// Create P-256 private key from derived seed (TLS uses P-256, not secp256k1)
-	p256Key, err := deriveP256Key(tlsKeyBytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to derive P-256 key: %w", err)
-	}
-
-	certPEM, keyPEM, err := luxtls.NewCertAndKeyBytesFromKey(p256Key)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate TLS cert: %w", err)
-	}
-	vk.StakerCert = certPEM
-	vk.StakerKey = keyPEM
-
-	// Derive NodeID from TLS cert
-	tlsCert, err := luxtls.LoadTLSCertFromBytes(keyPEM, certPEM)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse TLS cert: %w", err)
-	}
-	stakingCert := &ids.Certificate{
-		Raw:       tlsCert.Leaf.Raw,
-		PublicKey: tlsCert.Leaf.PublicKey,
-	}
-	vk.NodeID = ids.NodeIDFromCert(stakingCert)
-
-	// 3. Derive BLS signer key deterministically from mnemonic
-	// Use a separate derivation path: m/44'/60'/2'/0/{index} for BLS keys
-	blsSeed, err := deriveMnemonicKeyForPath(mnemonic, 2, accountIndex) // account=2 for BLS
-	if err != nil {
-		return nil, fmt.Errorf("failed to derive BLS key seed: %w", err)
-	}
-
-	// Create BLS signer from seed using proper BLS key derivation (handles field order internally)
-	blsKey, err := localsigner.FromSeed(blsSeed)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create BLS key from seed: %w", err)
-	}
-	vk.BLSSecretKey = blsKey.ToBytes()
-
-	pop, err := signer.NewProofOfPossession(blsKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate BLS PoP: %w", err)
-	}
-	vk.BLSPublicKey = pop.PublicKey[:]
-	vk.BLSPoP = pop.ProofOfPossession[:]
-
-	return vk, nil
-}
-
-// deriveP256Key creates an ECDSA P-256 private key from a 32-byte seed.
-// This allows deterministic TLS key generation from mnemonic-derived seeds.
-func deriveP256Key(seed []byte) (*ecdsa.PrivateKey, error) {
-	if len(seed) < 32 {
-		return nil, fmt.Errorf("seed must be at least 32 bytes")
-	}
-
-	// Use the seed as the private key scalar (reduced mod curve order)
-	curve := elliptic.P256()
-	k := new(big.Int).SetBytes(seed[:32])
-	k.Mod(k, curve.Params().N)
-
-	// Ensure k is not zero
-	if k.Sign() == 0 {
-		k.SetInt64(1)
-	}
-
-	priv := &ecdsa.PrivateKey{
-		PublicKey: ecdsa.PublicKey{
-			Curve: curve,
-		},
-		D: k,
-	}
-	priv.PublicKey.X, priv.PublicKey.Y = curve.ScalarBaseMult(k.Bytes())
-
-	return priv, nil
-}
-
-// deriveMnemonicKeyForPath derives a key using BIP44 path m/44'/60'/{account}'/0/{index}
-func deriveMnemonicKeyForPath(mnemonic string, account, index uint32) ([]byte, error) {
-	if !bip39.IsMnemonicValid(mnemonic) {
-		return nil, fmt.Errorf("invalid mnemonic phrase")
-	}
-	seed := bip39.NewSeed(mnemonic, "")
-
-	// Create master key from seed
-	masterKey, err := bip32.NewMasterKey(seed)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create master key: %w", err)
-	}
-
-	// BIP-44 path: m/44'/60'/{account}'/0/{index}
-	// m/44' (purpose)
-	key, err := masterKey.NewChildKey(bip32.FirstHardenedChild + 44)
-	if err != nil {
-		return nil, fmt.Errorf("failed to derive purpose: %w", err)
-	}
-
-	// m/44'/60' (coin type for LUX)
-	key, err = key.NewChildKey(bip32.FirstHardenedChild + LUXCoinType)
-	if err != nil {
-		return nil, fmt.Errorf("failed to derive coin type: %w", err)
-	}
-
-	// m/44'/60'/{account}' (account - 0=EC, 1=TLS, 2=BLS)
-	key, err = key.NewChildKey(bip32.FirstHardenedChild + account)
-	if err != nil {
-		return nil, fmt.Errorf("failed to derive account: %w", err)
-	}
-
-	// m/44'/60'/{account}'/0 (change)
-	key, err = key.NewChildKey(0)
-	if err != nil {
-		return nil, fmt.Errorf("failed to derive change: %w", err)
-	}
-
-	// m/44'/60'/{account}'/0/{index} (address index)
-	key, err = key.NewChildKey(index)
-	if err != nil {
-		return nil, fmt.Errorf("failed to derive address index: %w", err)
-	}
-
-	return key.Key, nil
-}
-
-// LUXCoinType is the BIP-44 coin type for LUX (60' = standard Ethereum)
-const LUXCoinType = 60
-
-// deriveMnemonicKey derives an EC private key from mnemonic using BIP44 path m/44'/60'/0'/0/{index}
-func deriveMnemonicKey(mnemonic string, accountIndex uint32) ([]byte, error) {
-	if !bip39.IsMnemonicValid(mnemonic) {
-		return nil, fmt.Errorf("invalid mnemonic phrase")
-	}
-	seed := bip39.NewSeed(mnemonic, "")
-
-	// Create master key from seed
-	masterKey, err := bip32.NewMasterKey(seed)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create master key: %w", err)
-	}
-
-	// BIP-44 path: m/44'/60'/0'/0/{accountIndex}
-	// m/44' (purpose)
-	key, err := masterKey.NewChildKey(bip32.FirstHardenedChild + 44)
-	if err != nil {
-		return nil, fmt.Errorf("failed to derive purpose: %w", err)
-	}
-
-	// m/44'/60' (coin type for LUX)
-	key, err = key.NewChildKey(bip32.FirstHardenedChild + LUXCoinType)
-	if err != nil {
-		return nil, fmt.Errorf("failed to derive coin type: %w", err)
-	}
-
-	// m/44'/60'/0' (account)
-	key, err = key.NewChildKey(bip32.FirstHardenedChild + 0)
-	if err != nil {
-		return nil, fmt.Errorf("failed to derive account: %w", err)
-	}
-
-	// m/44'/60'/0'/0 (change)
-	key, err = key.NewChildKey(0)
-	if err != nil {
-		return nil, fmt.Errorf("failed to derive change: %w", err)
-	}
-
-	// m/44'/60'/0'/0/{accountIndex} (address index)
-	key, err = key.NewChildKey(accountIndex)
-	if err != nil {
-		return nil, fmt.Errorf("failed to derive address index: %w", err)
-	}
-
-	return key.Key, nil
 }
