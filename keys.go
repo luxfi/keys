@@ -327,7 +327,16 @@ func (ks *KeyStore) List() ([]string, error) {
 	var names []string
 	for _, entry := range entries {
 		if entry.IsDir() {
-			names = append(names, entry.Name())
+			name := entry.Name()
+			// Skip hidden directories (like .git) and non-node directories
+			if strings.HasPrefix(name, ".") {
+				continue
+			}
+			// Only include node* directories
+			if !strings.HasPrefix(name, "node") {
+				continue
+			}
+			names = append(names, name)
 		}
 	}
 	return names, nil
@@ -470,8 +479,8 @@ func DeriveValidatorFromMnemonic(mnemonic string, accountIndex uint32) (*Validat
 		return nil, fmt.Errorf("failed to derive BLS key seed: %w", err)
 	}
 
-	// BLS secret keys are 32 bytes - use the derived seed directly
-	blsKey, err := localsigner.FromBytes(blsSeed)
+	// Create BLS signer from seed using proper BLS key derivation (handles field order internally)
+	blsKey, err := localsigner.FromSeed(blsSeed)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create BLS key from seed: %w", err)
 	}
@@ -611,3 +620,4 @@ func deriveMnemonicKey(mnemonic string, accountIndex uint32) ([]byte, error) {
 
 	return key.Key, nil
 }
+
