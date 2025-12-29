@@ -59,14 +59,12 @@ github.com/jessevdk/go-flags v0.0.0-20141203071132-1679536dcc89/go.mod h1:4FA24M
 github.com/jessevdk/go-flags v1.4.0/go.mod h1:4FA24M0QyGHXBuZZK/XkWh8h0e1EYbRYJSGM75WSRxI=
 github.com/jrick/logrotate v1.0.0/go.mod h1:LNinyqDIJnpAur+b8yyulnQw/wDuN1+BYKlTRt3OuAQ=
 github.com/kkdai/bstream v0.0.0-20161212061736-f391b8402d23/go.mod h1:J+Gs4SYgM6CZQHDETBtE9HaSEkGmuNXF86RwHhHUvq4=
-github.com/klauspost/compress v1.18.0 h1:c/Cqfb0r+Yi+JtIEq73FWXVkRonBlf0CRNYc8Zttxdo=
-github.com/klauspost/compress v1.18.0/go.mod h1:2Pp+KzxcywXVXMr50+X0Q/Lsb43OQHYWRCY2AiWywWQ=
 github.com/luxfi/cache v1.0.0 h1:OcqGi/qs9ky+7O8fR6WMZtFsunvA40LBTg3QRQqJurs=
 github.com/luxfi/cache v1.0.0/go.mod h1:BEvpffvV3SXs/KSa9nUC1TszxKwUdIHwIaoXpeiYU+Y=
 github.com/luxfi/consensus v1.22.39 h1:wpN8s7MITFKCdaXHBtH5h9qxOtimg1jDlBKRBYZhAa4=
 github.com/luxfi/consensus v1.22.39/go.mod h1:cMUQ6aKRfwruhWSOzhkh0QG3Rg5oj7Lyn21LLbAh/jU=
-github.com/luxfi/constants v1.2.4 h1:tUZfdNnn/N8Zs0NnDn1z+atrDz1AZtH+Dtowvyhx+Bg=
-github.com/luxfi/constants v1.2.4/go.mod h1:YyHBi205pBpzgYCmD44QPb6dCOzKTK0jwpGrfB4kcRA=
+github.com/luxfi/const v1.4.0 h1:8bHt5I8g76TkeuFIY478aYtfcLgbdkGNo/e/Sy3+6p0=
+github.com/luxfi/const v1.4.0/go.mod h1:qWfecjdImPY3kXsy3UAe4ZVpMcsp2/iUlHwUMPVREoI=
 github.com/luxfi/crypto v1.17.25 h1:emTejQ17bGj/1tu0ETB196Hbn6fJfo8wUNGIOWit6RM=
 github.com/luxfi/crypto v1.17.25/go.mod h1:v6eaW5ejuzW2gecChWKQqx4CtVhoM1b+e40ro/6WVPg=
 github.com/luxfi/go-bip32 v1.0.2 h1:7vFbb+Wr4Z499q2tuCLdd7wWjtn8sH+HWBlx76mhH9Y=

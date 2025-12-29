@@ -6,7 +6,7 @@ package keys
 import (
 	"fmt"
 
-	"github.com/luxfi/constants"
+	"github.com/luxfi/const"
 	"github.com/luxfi/node/utils/formatting/address"
 )
 
