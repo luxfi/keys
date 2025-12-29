@@ -3,7 +3,7 @@ module github.com/luxfi/keys
 go 1.25.5
 
 require (
-	github.com/luxfi/constants v1.2.4
+	github.com/luxfi/const v1.4.0
 	github.com/luxfi/crypto v1.17.25
 	github.com/luxfi/go-bip32 v1.0.2
 	github.com/luxfi/go-bip39 v1.1.2
@@ -18,7 +18,6 @@ require (
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
 	github.com/google/renameio/v2 v2.0.0 // indirect
 	github.com/gorilla/rpc v1.2.1 // indirect
-	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/luxfi/cache v1.0.0 // indirect
 	github.com/luxfi/consensus v1.22.39 // indirect
 	github.com/luxfi/math v1.1.1 // indirect
