@@ -278,7 +278,7 @@ func LoadFromDir(nodeDir string) (*ValidatorKey, error) {
 		if err == nil {
 			pk := bls.PublicFromSecretKey(sk)
 			vk.BLSPublicKey = bls.PublicKeyToCompressedBytes(pk)
-			sig := bls.Sign(sk, vk.BLSPublicKey)
+			sig := bls.SignProofOfPossession(sk, vk.BLSPublicKey)
 			vk.BLSPoP = bls.SignatureToBytes(sig)
 		}
 	}
