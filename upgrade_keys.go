@@ -16,8 +16,8 @@ import (
 	"github.com/luxfi/crypto/bls/signer/localsigner"
 	luxcrypto "github.com/luxfi/crypto/secp256k1"
 	"github.com/luxfi/ids"
-	"github.com/luxfi/node/staking"
-	"github.com/luxfi/node/vms/platformvm/signer"
+	luxtls "github.com/luxfi/tls"
+	"github.com/luxfi/vm/platformvm/signer"
 )
 
 func main() {
@@ -75,7 +75,7 @@ func upgradeNode(nodeDir string) error {
 		return fmt.Errorf("failed to read staker.key: %w", err)
 	}
 
-	tlsCert, err := staking.LoadTLSCertFromBytes(keyPEM, certPEM)
+	tlsCert, err := luxtls.LoadTLSCertFromBytes(keyPEM, certPEM)
 	if err != nil {
 		return fmt.Errorf("failed to load TLS cert: %w", err)
 	}
