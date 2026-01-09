@@ -6,18 +6,18 @@ package keys
 import (
 	"fmt"
 
+	"github.com/luxfi/address"
 	"github.com/luxfi/constants"
-	"github.com/luxfi/node/utils/formatting/address"
 )
 
 // Unit constants for LUX amounts
 const (
-	MicroLux uint64 = 1                         // Base unit (6 decimals)
-	Lux      uint64 = 1_000_000                 // 10^6 microLux
-	KiloLux  uint64 = 1_000 * Lux               // 10^9
-	MegaLux  uint64 = 1_000_000 * Lux           // 10^12
-	GigaLux  uint64 = 1_000_000_000 * Lux       // 10^15 (1B LUX)
-	TeraLux  uint64 = 1_000_000_000_000 * Lux   // 10^18 (1T LUX)
+	MicroLux uint64 = 1                       // Base unit (6 decimals)
+	Lux      uint64 = 1_000_000               // 10^6 microLux
+	KiloLux  uint64 = 1_000 * Lux             // 10^9
+	MegaLux  uint64 = 1_000_000 * Lux         // 10^12
+	GigaLux  uint64 = 1_000_000_000 * Lux     // 10^15 (1B LUX)
+	TeraLux  uint64 = 1_000_000_000_000 * Lux // 10^18 (1T LUX)
 
 	// C-chain uses 18 decimals (wei), P/X-chain use 6 decimals
 	// Multiply P-chain amount by this to get C-chain wei
@@ -53,9 +53,9 @@ type LockedAmount struct {
 
 // Staker represents an initial validator in genesis
 type Staker struct {
-	NodeID        string `json:"nodeID"`
-	RewardAddress string `json:"rewardAddress"`
-	DelegationFee uint32 `json:"delegationFee"`
+	NodeID        string  `json:"nodeID"`
+	RewardAddress string  `json:"rewardAddress"`
+	DelegationFee uint32  `json:"delegationFee"`
 	Signer        *Signer `json:"signer,omitempty"`
 }
 
@@ -109,9 +109,9 @@ func NewAllocationBuilder(networkID uint32, keys []*ValidatorKey) *AllocationBui
 		amountPerKey:    DefaultValidatorStake,
 		feeAccountIndex: 0,
 		feeAccountExtra: DefaultFeeAccountAmount,
-		vestingStart:    1577836800, // Jan 1, 2020
+		vestingStart:    1577836800,         // Jan 1, 2020
 		vestingInterval: 365 * 24 * 60 * 60, // 1 year
-		vestingPeriods:  100, // 100 years
+		vestingPeriods:  100,                // 100 years
 		noVesting:       false,
 	}
 }
@@ -254,7 +254,7 @@ func QuickAllocations(networkID uint32, keys []*ValidatorKey, amountPerKey uint6
 // TestnetAllocations creates allocations suitable for testnet (no vesting)
 func TestnetAllocations(networkID uint32, keys []*ValidatorKey) (*GenesisAllocations, error) {
 	return NewAllocationBuilder(networkID, keys).
-		WithAmount(100 * MegaLux). // 100M LUX per validator
+		WithAmount(100*MegaLux).       // 100M LUX per validator
 		WithFeeAccount(0, 10*MegaLux). // First validator gets extra
 		WithNoVesting().
 		Build()
@@ -265,9 +265,9 @@ func MainnetAllocations(networkID uint32, keys []*ValidatorKey) (*GenesisAllocat
 	return NewAllocationBuilder(networkID, keys).
 		WithAmount(GigaLux). // 1B LUX per validator
 		WithVesting(
-			1577836800,          // Jan 1, 2020
-			365*24*60*60,        // 1 year intervals
-			100,                 // 100 periods
+			1577836800,   // Jan 1, 2020
+			365*24*60*60, // 1 year intervals
+			100,          // 100 periods
 		).
 		Build()
 }
