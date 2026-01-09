@@ -19,14 +19,13 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/luxfi/crypto/bls"
 	"github.com/luxfi/crypto/bls/signer/localsigner"
 	luxcrypto "github.com/luxfi/crypto/secp256k1"
 	"github.com/luxfi/go-bip32"
 	"github.com/luxfi/go-bip39"
 	"github.com/luxfi/ids"
-	"github.com/luxfi/node/staking"
-	"github.com/luxfi/node/vms/platformvm/signer"
+	luxtls "github.com/luxfi/tls"
+	"github.com/luxfi/vm/platformvm/signer"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -76,7 +75,7 @@ func GenerateValidatorKey() (*ValidatorKey, error) {
 	vk := &ValidatorKey{}
 
 	// 1. Generate TLS staking key
-	certPEM, keyPEM, err := staking.NewCertAndKeyBytes()
+	certPEM, keyPEM, err := luxtls.NewCertAndKeyBytes()
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate TLS cert: %w", err)
 	}
@@ -85,7 +84,7 @@ func GenerateValidatorKey() (*ValidatorKey, error) {
 	vk.StakerKey = keyPEM
 
 	// Parse cert to derive NodeID
-	tlsCert, err := staking.LoadTLSCertFromBytes(keyPEM, certPEM)
+	tlsCert, err := luxtls.LoadTLSCertFromBytes(keyPEM, certPEM)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse TLS cert: %w", err)
 	}
@@ -234,7 +233,7 @@ func LoadFromDir(nodeDir string) (*ValidatorKey, error) {
 	// If TLS cert/key missing, generate them and persist
 	if err != nil || kerr != nil || len(certPEM) == 0 || len(keyPEM) == 0 {
 		fmt.Printf("  Generating TLS staking cert for %s\n", filepath.Base(nodeDir))
-		certPEM, keyPEM, err = staking.NewCertAndKeyBytes()
+		certPEM, keyPEM, err = luxtls.NewCertAndKeyBytes()
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate TLS cert: %w", err)
 		}
@@ -254,7 +253,7 @@ func LoadFromDir(nodeDir string) (*ValidatorKey, error) {
 	vk.StakerKey = keyPEM
 
 	// Derive NodeID from TLS cert
-	tlsCert, err := staking.LoadTLSCertFromBytes(keyPEM, certPEM)
+	tlsCert, err := luxtls.LoadTLSCertFromBytes(keyPEM, certPEM)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load TLS cert: %w", err)
 	}
@@ -273,13 +272,15 @@ func LoadFromDir(nodeDir string) (*ValidatorKey, error) {
 	}
 	if len(signerBytes) > 0 {
 		vk.BLSSecretKey = signerBytes
-		// Derive public key and PoP
-		sk, err := bls.SecretKeyFromBytes(signerBytes)
+		// Derive public key and PoP using localsigner + signer.NewProofOfPossession
+		// This must match how keys are generated in GenerateValidatorKey/DeriveValidatorFromMnemonic
+		blsSigner, err := localsigner.FromBytes(signerBytes)
 		if err == nil {
-			pk := bls.PublicFromSecretKey(sk)
-			vk.BLSPublicKey = bls.PublicKeyToCompressedBytes(pk)
-			sig := bls.SignProofOfPossession(sk, vk.BLSPublicKey)
-			vk.BLSPoP = bls.SignatureToBytes(sig)
+			pop, err := signer.NewProofOfPossession(blsSigner)
+			if err == nil {
+				vk.BLSPublicKey = pop.PublicKey[:]
+				vk.BLSPoP = pop.ProofOfPossession[:]
+			}
 		}
 	}
 
@@ -454,7 +455,7 @@ func DeriveValidatorFromMnemonic(mnemonic string, accountIndex uint32) (*Validat
 		return nil, fmt.Errorf("failed to derive P-256 key: %w", err)
 	}
 
-	certPEM, keyPEM, err := staking.NewCertAndKeyBytesFromKey(p256Key)
+	certPEM, keyPEM, err := luxtls.NewCertAndKeyBytesFromKey(p256Key)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate TLS cert: %w", err)
 	}
@@ -462,7 +463,7 @@ func DeriveValidatorFromMnemonic(mnemonic string, accountIndex uint32) (*Validat
 	vk.StakerKey = keyPEM
 
 	// Derive NodeID from TLS cert
-	tlsCert, err := staking.LoadTLSCertFromBytes(keyPEM, certPEM)
+	tlsCert, err := luxtls.LoadTLSCertFromBytes(keyPEM, certPEM)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse TLS cert: %w", err)
 	}
@@ -620,4 +621,3 @@ func deriveMnemonicKey(mnemonic string, accountIndex uint32) ([]byte, error) {
 
 	return key.Key, nil
 }
-
