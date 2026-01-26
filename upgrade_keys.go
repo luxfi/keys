@@ -16,8 +16,8 @@ import (
 	"github.com/luxfi/crypto/bls/signer/localsigner"
 	luxcrypto "github.com/luxfi/crypto/secp256k1"
 	"github.com/luxfi/ids"
+	"github.com/luxfi/protocol/p/signer"
 	luxtls "github.com/luxfi/tls"
-	"github.com/luxfi/vm/platformvm/signer"
 )
 
 func main() {

@@ -24,8 +24,8 @@ import (
 	"github.com/luxfi/go-bip32"
 	"github.com/luxfi/go-bip39"
 	"github.com/luxfi/ids"
+	"github.com/luxfi/protocol/p/signer"
 	luxtls "github.com/luxfi/tls"
-	"github.com/luxfi/vm/platformvm/signer"
 	"golang.org/x/crypto/sha3"
 )
 
