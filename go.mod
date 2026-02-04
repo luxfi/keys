@@ -11,7 +11,7 @@ require (
 	github.com/luxfi/ids v1.2.9
 	github.com/luxfi/protocol v0.0.2
 	github.com/luxfi/tls v1.0.3
-	golang.org/x/crypto v0.46.0
+	golang.org/x/crypto v0.47.0
 )
 
 require (
@@ -19,7 +19,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/btcsuite/btcd/btcutil v1.1.6 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/cloudflare/circl v1.6.2 // indirect
+	github.com/cloudflare/circl v1.6.3 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
 	github.com/gorilla/rpc v1.2.1 // indirect
 	github.com/holiman/uint256 v1.3.2 // indirect
@@ -43,8 +43,8 @@ require (
 	github.com/supranational/blst v0.3.16 // indirect
 	go.uber.org/mock v0.6.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
-	golang.org/x/exp v0.0.0-20251219203646-944ab1f22d93 // indirect
-	golang.org/x/sys v0.39.0 // indirect
+	golang.org/x/exp v0.0.0-20260112195511-716be5621a96 // indirect
+	golang.org/x/sys v0.40.0 // indirect
 	gonum.org/v1/gonum v0.16.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )
