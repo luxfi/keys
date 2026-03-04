@@ -1,6 +1,6 @@
 module github.com/luxfi/keys
 
-go 1.25.5
+go 1.26
 
 require (
 	github.com/luxfi/address v1.0.1
