@@ -12,7 +12,7 @@ import (
 func main() {
 	mnemonic := os.Getenv("LUX_MNEMONIC")
 	if mnemonic == "" {
-		mnemonic = "REDACTED_USE_KMS"
+		mnemonic = "REDACTED_MNEMONIC_USE_KMS"
 	}
 
 	fmt.Println("Deriving 5 validators from mnemonic using DeriveValidatorFromMnemonic...")
