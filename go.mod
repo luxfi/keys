@@ -9,7 +9,7 @@ require (
 	github.com/luxfi/go-bip32 v1.0.2
 	github.com/luxfi/go-bip39 v1.1.2
 	github.com/luxfi/ids v1.2.9
-	github.com/luxfi/protocol v0.0.3
+	github.com/luxfi/proto v1.0.0
 	github.com/luxfi/tls v1.0.3
 	golang.org/x/crypto v0.49.0
 )
