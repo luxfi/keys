@@ -9,7 +9,7 @@ require (
 	github.com/luxfi/go-bip32 v1.0.2
 	github.com/luxfi/go-bip39 v1.1.2
 	github.com/luxfi/ids v1.2.9
-	github.com/luxfi/protocol v0.0.3
+	github.com/luxfi/proto v0.0.0-proto-rename
 	github.com/luxfi/tls v1.0.3
 	golang.org/x/crypto v0.49.0
 )
@@ -40,3 +40,7 @@ require (
 	gonum.org/v1/gonum v0.17.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )
+
+// Local-dev overlay for the protocol → proto rename.
+// Strip once GitHub admin renames luxfi/protocol → luxfi/proto and a real tag exists.
+replace github.com/luxfi/proto => ../protocol
