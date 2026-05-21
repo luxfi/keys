@@ -15,7 +15,7 @@ import (
 )
 
 func main() {
-	keysDir := "/Users/z/work/lux/keys"
+	keysDir := os.ExpandEnv("$HOME/work/lux/keys")
 
 	for i := 1; i <= 5; i++ {
 		certPath := filepath.Join(keysDir, fmt.Sprintf("node%d", i), "staker.crt")
