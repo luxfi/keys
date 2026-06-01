@@ -35,8 +35,9 @@
 //
 // Production:
 //
-//	mnemonic = keys.LoadMnemonic(ctx, kmsAddr, "main", "/mnemonic")
-//	id, err  = keys.NewServiceIdentity(mnemonic, "hanzo/kms-operator")
+//	bootstrap = keys.NewServiceIdentity(bootstrapMnemonic, "luxd/staking-bootstrap")
+//	mnemonic  = keys.LoadMnemonic(ctx, kmsAddr, "main", "/mnemonic", bootstrap)
+//	id, err   = keys.NewServiceIdentity(mnemonic, "hanzo/kms-operator")
 //	if err != nil { … }
 //	defer id.Wipe()
 //	sig, err := id.Sign(envelope)
