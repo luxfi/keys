@@ -33,6 +33,7 @@ import (
 	"strings"
 
 	bip39 "github.com/luxfi/go-bip39"
+	"github.com/luxfi/kms/pkg/envelope"
 	"github.com/luxfi/kms/pkg/zapclient"
 )
 
@@ -46,8 +47,23 @@ type MnemonicReader interface {
 
 // dialKMS is the production seam. Tests override to inject a fake
 // without touching the network.
-var dialKMS = func(ctx context.Context, addr string) (MnemonicReader, error) {
-	c, err := zapclient.Dial(ctx, addr, "")
+//
+// identity is REQUIRED for the production path (the KMS server's
+// consensus-auth gate rejects envelopes without a signed identity).
+// Passing nil dials anonymously — accepted only by legacy KMS peers
+// that have explicitly disabled the auth gate (dev / loopback only).
+var dialKMS = func(ctx context.Context, addr string, identity *ServiceIdentity) (MnemonicReader, error) {
+	cfg := zapclient.Config{PeerAddr: addr}
+	if identity != nil {
+		cfg.IdentityHeader = envelope.IdentityHeader{
+			NodeID:      identity.NodeID,
+			FullDigest:  identity.FullDigest,
+			ServicePath: identity.ServicePath,
+			PublicKey:   identity.PublicKey,
+		}
+		cfg.Signer = identity
+	}
+	c, err := zapclient.DialWithConfig(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -58,27 +74,38 @@ var dialKMS = func(ctx context.Context, addr string) (MnemonicReader, error) {
 // MNEMONIC env wins when set; otherwise dials KMS over native ZAP at
 // `addr` and reads the secret at `path` under `env`.
 //
-//	addr  KMS host:port (e.g. "kms.internal.svc:9999")
-//	env   KMS env scope ("mainnet" | "testnet" | "devnet")
-//	path  KMS secret path (e.g. "/mnemonic" or "/foo/master")
+//	ctx      cancellable context
+//	addr     KMS host:port (e.g. "kms.internal.svc:9999")
+//	env      KMS env scope ("mainnet" | "testnet" | "devnet")
+//	path     KMS secret path (e.g. "/mnemonic" or "/foo/master")
+//	identity ServiceIdentity to sign the secret-opcode envelope. May
+//	         be nil for legacy peers and the env-win short-circuit
+//	         (the KMS dial is never reached); required for production
+//	         peers whose consensus-auth gate is engaged.
 //
 // Returns the validated BIP-39 phrase. Caller is responsible for
 // keeping it on the goroutine stack and not logging / persisting it.
-func LoadMnemonic(ctx context.Context, addr, env, path string) (string, error) {
+func LoadMnemonic(ctx context.Context, addr, env, path string, identity *ServiceIdentity) (string, error) {
 	if e := strings.TrimSpace(os.Getenv("MNEMONIC")); e != "" {
 		if !bip39.IsMnemonicValid(e) {
 			return "", errors.New("MNEMONIC env is not a valid BIP-39 phrase")
 		}
 		return e, nil
 	}
-	return LoadMnemonicFromKMS(ctx, addr, env, path)
+	return LoadMnemonicFromKMS(ctx, addr, env, path, identity)
 }
 
 // LoadMnemonicFromKMS is the production-only path (no MNEMONIC env
 // short-circuit). Useful when a caller wants to force the KMS read
 // regardless of ambient env — e.g., a regression test pinning the
 // production code path.
-func LoadMnemonicFromKMS(ctx context.Context, addr, env, path string) (string, error) {
+//
+// identity is the *ServiceIdentity threaded into the ZAP dial: its
+// IdentityHeader becomes envelope.Identity and the same identity
+// signs every secret-opcode envelope. Pass nil only when dialling a
+// legacy KMS peer that has not enabled the consensus-auth gate
+// (dev / loopback fakes — see zap_test.go's withDial seam).
+func LoadMnemonicFromKMS(ctx context.Context, addr, env, path string, identity *ServiceIdentity) (string, error) {
 	if addr == "" {
 		return "", errors.New("keys.LoadMnemonicFromKMS: KMS addr is required")
 	}
@@ -89,7 +116,7 @@ func LoadMnemonicFromKMS(ctx context.Context, addr, env, path string) (string, e
 		return "", errors.New("keys.LoadMnemonicFromKMS: KMS path is required")
 	}
 
-	c, err := dialKMS(ctx, addr)
+	c, err := dialKMS(ctx, addr, identity)
 	if err != nil {
 		return "", fmt.Errorf("dial KMS %s: %w", addr, err)
 	}
