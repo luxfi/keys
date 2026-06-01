@@ -61,12 +61,13 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
-// CoinTypeLux is the SLIP-0044 coin_type for Lux P/X chains. Service
-// identities derive under m/44'/9000'/<serviceIndex>'/0'/0' so they
-// share the same coin-type as Lux staking keys but never collide with
-// account-zero derivations (serviceIndex is hashed from servicePath,
-// never 0 in practice for any well-formed path).
-const CoinTypeLux = 9000
+// CoinTypeUTXO is the SLIP-0044 coin_type for the UTXO-layout DAG-like
+// chains — X-Chain (AVM) + P-Chain. Service identities derive under
+// m/44'/9000'/<serviceIndex>'/0'/0' so they share the coin-type tree
+// with X/P staking keys but never collide with account-zero derivations
+// (serviceIndex is hashed from servicePath, never 0 in practice for
+// any well-formed path).
+const CoinTypeUTXO = 9000
 
 // BIP44Purpose is the BIP-44 purpose constant. Pinned to 44 even though
 // service identities don't carry funds — staying inside the BIP-44
@@ -163,7 +164,7 @@ func NewServiceIdentity(mnemonic, servicePath string) (*ServiceIdentity, error) 
 	if err != nil {
 		return nil, fmt.Errorf("keys: derive purpose: %w", err)
 	}
-	coin, err := purpose.NewChildKey(bip32.FirstHardenedChild + CoinTypeLux)
+	coin, err := purpose.NewChildKey(bip32.FirstHardenedChild + CoinTypeUTXO)
 	if err != nil {
 		return nil, fmt.Errorf("keys: derive coin: %w", err)
 	}
