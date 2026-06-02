@@ -55,12 +55,38 @@ import (
 	"fmt"
 
 	mldsa "github.com/luxfi/crypto/mldsa"
+	secp "github.com/luxfi/crypto/secp256k1"
 	bip32 "github.com/luxfi/go-bip32"
 	bip39 "github.com/luxfi/go-bip39"
 	"github.com/luxfi/ids"
 	"golang.org/x/crypto/hkdf"
 	"golang.org/x/crypto/sha3"
 )
+
+// HybridClassicalLeafIndex is the BIP-32 leaf index for the secp256k1
+// (classical) component of a hybrid validator identity. Pinned at 0 so
+// it coincides with the existing ML-DSA-65-only service identity leaf
+// — a hybrid identity is a superset, never a different tree position.
+const HybridClassicalLeafIndex uint32 = 0
+
+// HybridPQLeafIndex is the BIP-32 leaf index for the ML-DSA-65 (PQ)
+// component of a hybrid validator identity. Pinned at 1 so the PQ key
+// derives at a sibling sub-path m/44'/9000'/serviceIndex'/0'/1' —
+// distinct from the classical leaf and from the legacy ML-DSA-only
+// leaf at index 0. The legacy path is preserved exactly; the new PQ
+// leaf is purely additive.
+const HybridPQLeafIndex uint32 = 1
+
+// HybridClassicalDomain is the SHAKE256 customisation string for the
+// secp256k1 component's scalar derivation. Pinned at v1.
+const HybridClassicalDomain = "lux-hybrid-classical-secp256k1-v1"
+
+// HybridPQDomain is the SHAKE256 customisation string for the ML-DSA-65
+// component's seed derivation. Pinned at v1. Distinct from
+// serviceIdentityDomain so a hybrid identity's PQ key is NEVER the same
+// byte-string as the legacy ML-DSA-only identity at the same path —
+// the two derivations are cryptographically separated.
+const HybridPQDomain = "lux-hybrid-pq-mldsa65-v1"
 
 // CoinTypeUTXO is the SLIP-0044 coin_type for the UTXO-layout DAG-like
 // chains — X-Chain (AVM) + P-Chain. Service identities derive under
@@ -387,4 +413,232 @@ func ServiceChainIDForCluster(clusterSeed string) ids.ID {
 		return ServiceChainID
 	}
 	return mustHashChainID("lux-service-identity:" + clusterSeed)
+}
+
+// HybridIdentity binds a mnemonic-derived BBF-bound hybrid signing key
+// (secp256k1 + ML-DSA-65) to its canonical NodeID. The struct owns the
+// joint private key; call Wipe() when done.
+//
+// The NodeID is committed to the wire-form joint pubkey via the
+// existing ids.NodeIDSchemeMLDSA65 derivation — chosen because the
+// PQ component is the binding primitive (an adversary that holds only
+// the classical key cannot mint a NodeID's matching FullDigest). Per
+// cryptographer review the single-SHAKE-256-384 derivation is sound;
+// no BTC-style double-hash is added.
+type HybridIdentity struct {
+	// ServicePath is the canonical path string (verbatim) used to
+	// derive both hybrid components. Stored for diagnostics.
+	ServicePath string
+
+	// NodeID is the 20-byte canonical NodeID derived under
+	// NodeIDSchemeMLDSA65 over the wire-form hybrid public key.
+	NodeID ids.NodeID
+
+	// TypedNodeID is the wire-form NodeID (scheme byte || NodeID).
+	TypedNodeID ids.TypedNodeID
+
+	// FullDigest is the 48-byte SHAKE256-384 commitment to the
+	// hybrid identity. Bound into envelope signatures.
+	FullDigest ids.FullDigest
+
+	// PublicKey is the joint public key value. Both components are
+	// always populated.
+	PublicKey *HybridPublicKey
+
+	// PublicKeyBytes is the canonical wire encoding of the joint
+	// pubkey — useful for logging, storage, and on-chain commitment.
+	// Same value HybridPublicKeyBytes(PublicKey) returns.
+	PublicKeyBytes []byte
+
+	// privateKey is the joint signing key. Never exposed via a
+	// getter; the only legal use is internal Sign().
+	privateKey *HybridPrivateKey
+}
+
+// DeriveHybridIdentity is the canonical constructor for a BBF-bound
+// hybrid validator identity. mnemonic must be a valid BIP-39 phrase;
+// servicePath must be non-empty. Returns the derived HybridIdentity
+// ready to Sign().
+//
+// Derivation tree:
+//
+//	classical: m/44' / 9000' / serviceIndex' / 0' / 0'   (secp256k1)
+//	pq:        m/44' / 9000' / serviceIndex' / 0' / 1'   (ML-DSA-65)
+//
+// The two leaves share the same hardened branches up to the role
+// node; the only branch that distinguishes them is the leaf index
+// (0 vs 1). Both leaves are hardened. The classical leaf at index 0
+// COINCIDES with the legacy ML-DSA-only service identity path — this
+// is intentional: a hybrid identity is a superset that adds a PQ
+// component, never a different tree position. The classical leaf is
+// then KDF-mixed with HybridClassicalDomain so the secp256k1 scalar
+// is cryptographically separated from any ML-DSA-only seed at the
+// same BIP-32 leaf — they share the leaf but not the seed.
+//
+// Pure function: given the same (mnemonic, servicePath) you get the
+// same HybridIdentity, byte-for-byte. No I/O, no randomness, no clock
+// reads.
+func DeriveHybridIdentity(mnemonic, servicePath string) (*HybridIdentity, error) {
+	if !bip39.IsMnemonicValid(mnemonic) {
+		return nil, errors.New("keys: invalid BIP-39 mnemonic")
+	}
+	servicePath = trimServicePath(servicePath)
+	if servicePath == "" {
+		return nil, ErrInvalidServicePath
+	}
+
+	seed := bip39.NewSeed(mnemonic, "")
+	master, err := bip32.NewMasterKey(seed)
+	if err != nil {
+		return nil, fmt.Errorf("keys: bip32 master: %w", err)
+	}
+
+	// Walk to the shared role node: m/44'/9000'/serviceIndex'/0'.
+	purpose, err := master.NewChildKey(bip32.FirstHardenedChild + BIP44Purpose)
+	if err != nil {
+		return nil, fmt.Errorf("keys: derive purpose: %w", err)
+	}
+	coin, err := purpose.NewChildKey(bip32.FirstHardenedChild + CoinTypeUTXO)
+	if err != nil {
+		return nil, fmt.Errorf("keys: derive coin: %w", err)
+	}
+	account, err := coin.NewChildKey(bip32.FirstHardenedChild + serviceIndex(servicePath))
+	if err != nil {
+		return nil, fmt.Errorf("keys: derive account: %w", err)
+	}
+	role, err := account.NewChildKey(bip32.FirstHardenedChild + 0)
+	if err != nil {
+		return nil, fmt.Errorf("keys: derive role: %w", err)
+	}
+
+	// Classical leaf: m/44'/9000'/serviceIndex'/0'/0' (hardened).
+	classicalLeaf, err := role.NewChildKey(bip32.FirstHardenedChild + HybridClassicalLeafIndex)
+	if err != nil {
+		return nil, fmt.Errorf("keys: derive classical leaf: %w", err)
+	}
+	classicalKey, err := classicalScalarFor(classicalLeaf.Key, servicePath)
+	if err != nil {
+		return nil, fmt.Errorf("keys: classical keygen: %w", err)
+	}
+
+	// PQ leaf: m/44'/9000'/serviceIndex'/0'/1' (hardened).
+	pqLeaf, err := role.NewChildKey(bip32.FirstHardenedChild + HybridPQLeafIndex)
+	if err != nil {
+		return nil, fmt.Errorf("keys: derive pq leaf: %w", err)
+	}
+	pqKey, err := pqKeyFor(pqLeaf.Key, servicePath)
+	if err != nil {
+		return nil, fmt.Errorf("keys: pq keygen: %w", err)
+	}
+
+	sk := &HybridPrivateKey{
+		Classical: classicalKey,
+		PQ:        pqKey,
+	}
+	pk := sk.Public()
+	pkBytes, err := HybridPublicKeyBytes(pk)
+	if err != nil {
+		return nil, fmt.Errorf("keys: marshal hybrid pubkey: %w", err)
+	}
+
+	// NodeID derivation: SHAKE256-384("NODE_ID_V1" || ServiceChainID
+	// || 0x42 || wire-form hybrid pubkey)[:20]. The 0x42 scheme byte
+	// matches the existing ML-DSA-65 scheme — the FullDigest is bound
+	// to the WHOLE hybrid pubkey (both components) so a hybrid NodeID
+	// is never the same as either component's NodeID-on-its-own.
+	scheme := ids.NodeIDSchemeMLDSA65
+	typed, full, err := ids.TypedNodeIDFromMLDSA(scheme, ServiceChainID, pkBytes)
+	if err != nil {
+		return nil, fmt.Errorf("keys: derive node id: %w", err)
+	}
+
+	return &HybridIdentity{
+		ServicePath:    servicePath,
+		NodeID:         typed.NodeID,
+		TypedNodeID:    typed,
+		FullDigest:     full,
+		PublicKey:      pk,
+		PublicKeyBytes: pkBytes,
+		privateKey:     sk,
+	}, nil
+}
+
+// Sign produces a BBF-bound joint signature over msg. Delegates to
+// HybridSign — the identity owns the joint private key.
+func (h *HybridIdentity) Sign(msg []byte) (*HybridSignature, error) {
+	if h == nil || h.privateKey == nil {
+		return nil, errors.New("keys: hybrid identity is empty (wiped?)")
+	}
+	// nil randSource → crypto/rand inside HybridSign.
+	return HybridSign(h.privateKey, msg, nil)
+}
+
+// Wipe zeroes the joint private key in place. Idempotent. Safe to call
+// from a defer on a nil receiver.
+func (h *HybridIdentity) Wipe() {
+	if h == nil {
+		return
+	}
+	if h.privateKey != nil {
+		h.privateKey.Wipe()
+		h.privateKey = nil
+	}
+}
+
+// classicalScalarFor returns a deterministic secp256k1 private key
+// derived from a BIP-32 hardened leaf key + servicePath. SHAKE256
+// absorbs the leaf key, the HybridClassicalDomain string, and the
+// servicePath; the resulting 32-byte digest is reduced mod the
+// secp256k1 group order by secp.ToPrivateKey, which rejects 0 and
+// scalars >= n.
+//
+// Pure function: same (leafKey, servicePath) → same private key.
+func classicalScalarFor(leafKey []byte, servicePath string) (*secp.PrivateKey, error) {
+	h := sha3.NewShake256()
+	_, _ = h.Write(leftEncode(uint64(len(HybridClassicalDomain)) * 8))
+	_, _ = h.Write([]byte(HybridClassicalDomain))
+	_, _ = h.Write(leftEncode(uint64(len(leafKey)) * 8))
+	_, _ = h.Write(leafKey)
+	_, _ = h.Write(leftEncode(uint64(len(servicePath)) * 8))
+	_, _ = h.Write([]byte(servicePath))
+
+	// secp256k1 group order n ≈ 2^256 - 2^32 - 977. The probability
+	// that a uniform 32-byte sample is >= n is ~2^-128 — astronomical.
+	// secp.ToPrivateKey rejects >= n and == 0; the loop below
+	// re-samples by extending the SHAKE squeeze. In practice the loop
+	// body runs exactly once for every well-formed input.
+	for {
+		var scalar [32]byte
+		_, _ = h.Read(scalar[:])
+		priv, err := secp.ToPrivateKey(scalar[:])
+		if err == nil {
+			return priv, nil
+		}
+		// Loop: SHAKE continues squeezing fresh bytes — this is the
+		// canonical resample idiom for rejection-sampled scalars.
+	}
+}
+
+// pqKeyFor returns a deterministic ML-DSA-65 private key derived from
+// a BIP-32 hardened leaf key + servicePath. The PQ derivation mirrors
+// the ML-DSA-only service identity: HKDF-Expand seeds circl's keygen
+// to the same keypair byte-for-byte. The HybridPQDomain string is
+// distinct from serviceIdentityDomain so a hybrid identity's PQ key
+// is NEVER the same byte-string as a legacy ML-DSA-only identity at
+// the same leaf.
+//
+// Pure function: same (leafKey, servicePath) → same private key.
+func pqKeyFor(leafKey []byte, servicePath string) (*mldsa.PrivateKey, error) {
+	h := sha3.NewShake256()
+	_, _ = h.Write(leftEncode(uint64(len(HybridPQDomain)) * 8))
+	_, _ = h.Write([]byte(HybridPQDomain))
+	_, _ = h.Write(leftEncode(uint64(len(leafKey)) * 8))
+	_, _ = h.Write(leafKey)
+	_, _ = h.Write(leftEncode(uint64(len(servicePath)) * 8))
+	_, _ = h.Write([]byte(servicePath))
+	seed := make([]byte, 32)
+	_, _ = h.Read(seed)
+
+	reader := hkdf.New(sha3.New256, seed, nil, []byte(HybridPQDomain))
+	return mldsa.GenerateKey(reader, mldsa.MLDSA65)
 }
