@@ -163,7 +163,7 @@ func TestServiceIdentity_WipeIsIdempotent(t *testing.T) {
 // TestServiceIdentity_NilSafeties — defensive zero-value semantics.
 func TestServiceIdentity_NilSafeties(t *testing.T) {
 	var id *ServiceIdentity
-	id.Wipe()                          // must not panic on nil
+	id.Wipe() // must not panic on nil
 	if _, err := id.Sign([]byte("x")); err == nil {
 		t.Errorf("Sign on nil should fail")
 	}

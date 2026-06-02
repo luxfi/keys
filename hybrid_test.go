@@ -237,8 +237,8 @@ func TestHybridSign_NoComponentSubstitution(t *testing.T) {
 	// Symmetric attack: adversary holds the classical side instead.
 	advClassical := freshClassicalOnly(t)
 	advJointPK2 := &HybridPublicKey{
-		Classical: advClassical.PublicKey(),    // adversary's classical
-		PQ:        hOriginal.PublicKey.PQ,      // same PQ
+		Classical: advClassical.PublicKey(), // adversary's classical
+		PQ:        hOriginal.PublicKey.PQ,   // same PQ
 	}
 	advMBound2, err := HybridBoundDigest(advJointPK2, msg)
 	if err != nil {
