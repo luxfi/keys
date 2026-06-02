@@ -8,8 +8,8 @@ require (
 	github.com/luxfi/crypto v1.19.0
 	github.com/luxfi/go-bip32 v1.0.2
 	github.com/luxfi/go-bip39 v1.1.2
-	github.com/luxfi/ids v1.2.9
-	github.com/luxfi/kms v1.9.12
+	github.com/luxfi/ids v1.2.13
+	github.com/luxfi/kms v1.11.3
 	github.com/luxfi/proto v1.0.0
 	github.com/luxfi/tls v1.0.3
 	golang.org/x/crypto v0.49.0
@@ -24,8 +24,9 @@ require (
 	github.com/gorilla/rpc v1.2.1 // indirect
 	github.com/grandcat/zeroconf v1.0.0 // indirect
 	github.com/holiman/uint256 v1.3.2 // indirect
-	github.com/luxfi/accel v1.0.7 // indirect
+	github.com/luxfi/accel v1.1.8 // indirect
 	github.com/luxfi/cache v1.2.1 // indirect
+	github.com/luxfi/codec v1.1.4 // indirect
 	github.com/luxfi/container v0.0.4 // indirect
 	github.com/luxfi/formatting v1.0.1 // indirect
 	github.com/luxfi/geth v1.16.79 // indirect
