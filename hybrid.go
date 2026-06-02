@@ -196,7 +196,7 @@ func boundDigest(pk *HybridPublicKey, msg []byte) ([]byte, error) {
 		return nil, ErrHybridNilKey
 	}
 	pkClassical := pk.Classical.CompressedBytes() // 33 bytes
-	pkPQ := pk.PQ.Bytes()                          // ML-DSA-65 pubkey bytes
+	pkPQ := pk.PQ.Bytes()                         // ML-DSA-65 pubkey bytes
 
 	h := sha3.NewShake256()
 	_, _ = h.Write(leftEncode(uint64(len(HybridSigDomain)) * 8))
@@ -230,11 +230,11 @@ func HybridBoundDigest(pk *HybridPublicKey, msg []byte) ([]byte, error) {
 //
 // Why two domain-separated bindings:
 //
-//   (1) m_bound's prefix binds the SHAKE256 input to this scheme.
-//   (2) The ML-DSA context binds the FIPS 204 signature itself to
-//       this scheme — preventing cross-protocol replay of a future
-//       hybrid signature against any other ML-DSA-65 surface (KMS
-//       envelope, P-Chain block, etc.).
+//	(1) m_bound's prefix binds the SHAKE256 input to this scheme.
+//	(2) The ML-DSA context binds the FIPS 204 signature itself to
+//	    this scheme — preventing cross-protocol replay of a future
+//	    hybrid signature against any other ML-DSA-65 surface (KMS
+//	    envelope, P-Chain block, etc.).
 //
 // rand is the randomness source for ML-DSA-65 hedged signing. If nil,
 // crypto/rand is used. The secp256k1 signature uses RFC 6979
