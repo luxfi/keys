@@ -34,8 +34,8 @@ require (
 	github.com/luxfi/mdns v0.1.1 // indirect
 	github.com/luxfi/metric v1.5.7 // indirect
 	github.com/luxfi/mock v0.1.1 // indirect
-	github.com/luxfi/sampler v1.0.0 // indirect
-	github.com/luxfi/vm v1.1.10 // indirect
+	github.com/luxfi/sampler v1.1.0 // indirect
+	github.com/luxfi/vm v1.2.0 // indirect
 	github.com/luxfi/zap v0.7.2 // indirect
 	github.com/miekg/dns v1.1.72 // indirect
 	github.com/mr-tron/base58 v1.2.0 // indirect
