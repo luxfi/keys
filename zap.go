@@ -63,7 +63,7 @@ var dialKMS = func(ctx context.Context, addr string) (MnemonicReader, error) {
 // `addr` and reads the secret at `path` under `env`.
 //
 //	ctx   cancellable context
-//	addr  KMS host:port (e.g. "kms.internal.svc:9999")
+//	addr  KMS host:port (e.g. "kms.lux.svc:9999")
 //	env   KMS env scope ("mainnet" | "testnet" | "devnet")
 //	path  KMS secret path (e.g. "/mnemonic" or "/foo/master")
 //
