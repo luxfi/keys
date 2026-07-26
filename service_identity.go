@@ -161,8 +161,22 @@ type ServiceIdentity struct {
 	PublicKey []byte
 
 	// privateKey is the ML-DSA-65 private key bytes. Never exposed via
-	// a getter; the only legal use is internal Sign().
+	// a getter; the only legal use is internal Sign() and the wiped-state
+	// sentinel.
 	privateKey []byte
+
+	// signer is the parsed ML-DSA-65 private key, cached ONCE at
+	// construction. Sign() reuses it instead of re-parsing s.privateKey
+	// on every call. This is deliberate and load-bearing: mldsa.
+	// PrivateKeyFromBytes stores its input slice by reference
+	// (secretKey: data) and arms a GC finalizer that Zeroize()s it. A
+	// per-call transient parse therefore ALIASES a byte slice whose
+	// finalizer, once the transient goes unreachable, zeroes the shared
+	// key mid-run — corrupting the next Sign (bites the CUSTODY+Save path
+	// that signs two envelopes per boot). Holding the parsed key on the
+	// struct keeps it reachable for the identity's whole lifetime, so the
+	// finalizer only fires at Wipe/teardown. Never exposed via a getter.
+	signer *mldsa.PrivateKey
 }
 
 // NewServiceIdentity is the canonical constructor. mnemonic must be a
@@ -236,6 +250,10 @@ func NewServiceIdentity(mnemonic, servicePath string) (*ServiceIdentity, error) 
 		FullDigest:  full,
 		PublicKey:   pubBytes,
 		privateKey:  privBytes,
+		// Cache the freshly-generated key as the signer. Its secretKey is
+		// independent of privBytes (privBytes is a copy), and holding it on
+		// the struct keeps its Zeroize finalizer dormant until Wipe.
+		signer: priv,
 	}, nil
 }
 
@@ -254,19 +272,19 @@ func NewServiceIdentity(mnemonic, servicePath string) (*ServiceIdentity, error) 
 // rejects an envelope signed by a different identity — even a key with
 // the same NodeID prefix.
 func (s *ServiceIdentity) Sign(envelope []byte) ([]byte, error) {
-	if s == nil || len(s.privateKey) == 0 {
+	if s == nil || s.signer == nil {
 		return nil, errors.New("keys: service identity is empty (wiped?)")
 	}
 	digest := envelopeDigest(s.FullDigest, envelope)
-	priv, err := mldsa.PrivateKeyFromBytes(mldsa.MLDSA65, s.privateKey)
-	if err != nil {
-		return nil, fmt.Errorf("keys: parse private key: %w", err)
-	}
-	// FIPS 204 §5.2 hedged sign — circl reads its own randomness
-	// internally. The EnvelopeDomain context byte string is bound
-	// into the signature so a cross-protocol replay of the same key
-	// against a different envelope shape rejects.
-	sig, err := priv.SignCtx(nil, digest, []byte(EnvelopeDomain))
+	// Reuse the cached signer — do NOT re-parse s.privateKey here. A
+	// per-call PrivateKeyFromBytes builds a transient that aliases
+	// s.privateKey and arms a Zeroize finalizer; once the transient goes
+	// unreachable the finalizer zeroes the shared key mid-run. See the
+	// signer field doc. circl reads its own randomness for the FIPS 204
+	// §5.2 hedged sign; the EnvelopeDomain context binds the signature to
+	// this envelope shape so a cross-protocol replay of the same key
+	// against a different shape rejects.
+	sig, err := s.signer.SignCtx(nil, digest, []byte(EnvelopeDomain))
 	if err != nil {
 		return nil, fmt.Errorf("keys: sign: %w", err)
 	}
@@ -307,6 +325,13 @@ func (s *ServiceIdentity) Wipe() {
 		s.privateKey[i] = 0
 	}
 	s.privateKey = nil
+	// Zeroize the cached signer's own key material (a distinct allocation
+	// from privateKey) and drop the reference so a subsequent Sign fails
+	// closed rather than signing with a zeroed key.
+	if s.signer != nil {
+		s.signer.Zeroize()
+		s.signer = nil
+	}
 }
 
 // envelopeDigest computes the canonical SHAKE256 digest a signature
