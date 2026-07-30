@@ -17,7 +17,6 @@ import (
 	luxcrypto "github.com/luxfi/crypto/secp256k1"
 	"github.com/luxfi/ids"
 	luxtls "github.com/luxfi/tls"
-	"github.com/luxfi/vm/platformvm/signer"
 )
 
 func main() {
@@ -110,7 +109,7 @@ func upgradeNode(nodeDir string) error {
 		}
 
 		// Also write public key info
-		pop, err := signer.NewProofOfPossession(blsKey)
+		pop, err := NewProofOfPossession(blsKey)
 		if err != nil {
 			return fmt.Errorf("failed to generate PoP: %w", err)
 		}
