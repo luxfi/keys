@@ -25,7 +25,6 @@ import (
 	"github.com/luxfi/go-bip39"
 	"github.com/luxfi/ids"
 	luxtls "github.com/luxfi/tls"
-	"github.com/luxfi/vm/platformvm/signer"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -101,7 +100,7 @@ func GenerateValidatorKey() (*ValidatorKey, error) {
 	}
 	vk.BLSSecretKey = blsKey.ToBytes()
 
-	pop, err := signer.NewProofOfPossession(blsKey)
+	pop, err := NewProofOfPossession(blsKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate BLS PoP: %w", err)
 	}
@@ -276,7 +275,7 @@ func LoadFromDir(nodeDir string) (*ValidatorKey, error) {
 		// This must match how keys are generated in GenerateValidatorKey/DeriveValidatorFromMnemonic
 		blsSigner, err := localsigner.FromBytes(signerBytes)
 		if err == nil {
-			pop, err := signer.NewProofOfPossession(blsSigner)
+			pop, err := NewProofOfPossession(blsSigner)
 			if err == nil {
 				vk.BLSPublicKey = pop.PublicKey[:]
 				vk.BLSPoP = pop.ProofOfPossession[:]
@@ -487,7 +486,7 @@ func DeriveValidatorFromMnemonic(mnemonic string, accountIndex uint32) (*Validat
 	}
 	vk.BLSSecretKey = blsKey.ToBytes()
 
-	pop, err := signer.NewProofOfPossession(blsKey)
+	pop, err := NewProofOfPossession(blsKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate BLS PoP: %w", err)
 	}
