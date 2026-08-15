@@ -165,17 +165,12 @@ type ServiceIdentity struct {
 	// sentinel.
 	privateKey []byte
 
-	// signer is the parsed ML-DSA-65 private key, cached ONCE at
-	// construction. Sign() reuses it instead of re-parsing s.privateKey
-	// on every call. This is deliberate and load-bearing: mldsa.
-	// PrivateKeyFromBytes stores its input slice by reference
-	// (secretKey: data) and arms a GC finalizer that Zeroize()s it. A
-	// per-call transient parse therefore ALIASES a byte slice whose
-	// finalizer, once the transient goes unreachable, zeroes the shared
-	// key mid-run — corrupting the next Sign (bites the CUSTODY+Save path
-	// that signs two envelopes per boot). Holding the parsed key on the
-	// struct keeps it reachable for the identity's whole lifetime, so the
-	// finalizer only fires at Wipe/teardown. Never exposed via a getter.
+	// signer is the parsed ML-DSA-65 private key. The identity parses once,
+	// at construction, and every Sign uses it: parsing is the expensive part
+	// and the result is immutable, so doing it per call buys nothing. Holding
+	// it for the identity's lifetime also means the key is zeroed exactly
+	// once, at Wipe, rather than whenever a transient happens to be
+	// collected. Never exposed through a getter.
 	signer *mldsa.PrivateKey
 }
 
@@ -250,9 +245,8 @@ func NewServiceIdentity(mnemonic, servicePath string) (*ServiceIdentity, error) 
 		FullDigest:  full,
 		PublicKey:   pubBytes,
 		privateKey:  privBytes,
-		// Cache the freshly-generated key as the signer. Its secretKey is
-		// independent of privBytes (privBytes is a copy), and holding it on
-		// the struct keeps its Zeroize finalizer dormant until Wipe.
+		// The generated key is the signer; privBytes is its serialized form,
+		// kept for Save and wiped alongside it.
 		signer: priv,
 	}, nil
 }
@@ -276,11 +270,7 @@ func (s *ServiceIdentity) Sign(envelope []byte) ([]byte, error) {
 		return nil, errors.New("keys: service identity is empty (wiped?)")
 	}
 	digest := envelopeDigest(s.FullDigest, envelope)
-	// Reuse the cached signer — do NOT re-parse s.privateKey here. A
-	// per-call PrivateKeyFromBytes builds a transient that aliases
-	// s.privateKey and arms a Zeroize finalizer; once the transient goes
-	// unreachable the finalizer zeroes the shared key mid-run. See the
-	// signer field doc. circl reads its own randomness for the FIPS 204
+	// circl reads its own randomness for the FIPS 204
 	// §5.2 hedged sign; the EnvelopeDomain context binds the signature to
 	// this envelope shape so a cross-protocol replay of the same key
 	// against a different shape rejects.
