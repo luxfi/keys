@@ -5,7 +5,7 @@ go 1.26.4
 require (
 	github.com/luxfi/address v1.1.1
 	github.com/luxfi/constants v1.6.2
-	github.com/luxfi/crypto v1.20.2
+	github.com/luxfi/crypto v1.20.5
 	github.com/luxfi/go-bip32 v1.1.0
 	github.com/luxfi/go-bip39 v1.2.0
 	github.com/luxfi/ids v1.3.2
