@@ -77,6 +77,8 @@ github.com/luxfi/container v0.2.1 h1:MTnfKXzS5+oxV5jKZerdOxSA6iMPaQI9/FWGufizzaw
 github.com/luxfi/container v0.2.1/go.mod h1:B+uM0wP0lGvt/SSK7QOEn/qBcsHzILVHlKikdCyzSgM=
 github.com/luxfi/crypto v1.20.2 h1:L81WEsU/hs2A76F5PWBusG0yU74QqkDdUqqgexWUxh4=
 github.com/luxfi/crypto v1.20.2/go.mod h1:qYHOM0lO4PRh7LEaObxFQUIMjmT1/paVm/WgZkobT1k=
+github.com/luxfi/crypto v1.20.5 h1:kL69Ewyr90A/wQsTnIK8Zj6cHUPYvM1WHhgSErc2Yh0=
+github.com/luxfi/crypto v1.20.5/go.mod h1:gic3n9puSJhZFonBfmIwc5Cck/SMqetxpcfzrk9gna8=
 github.com/luxfi/geth v1.20.1 h1:QUGQr4AKvADjwMi7t8a0OfoyxShgEcI9pwie1jFYfm0=
 github.com/luxfi/geth v1.20.1/go.mod h1:GV5bIMEgWviRN+jPXERyVpI16H3iHqPcdIokDoZdrvU=
 github.com/luxfi/go-bip32 v1.1.0 h1:zjy19WKa1KJnGamRNyOZM3l/MPtV/sax7M4NMPwLHZQ=
